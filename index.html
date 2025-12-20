@@ -75,7 +75,7 @@
             <input type="number" id="manualInput" placeholder="Nº" min="1" value="20" oninput="actualizarGraficas()">
 
             <label for="dateInput">Fecha:</label>
-            <input type="text" id="dateInput" title="yyyy-mm-dd"><div style="width: 20px;"></div> 
+            <select id="dateInput" onchange="descargarDatos()"></select>
             
         </div>
 
@@ -88,7 +88,7 @@
     </div>
 
     <script>
-        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzl4s-9Ry-KleGBsuYN69yZUqn4LYTDdSN_OAjmqGPMds4dzqFu-GJVgohqXs1C_M8P/exec";
+        const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwoCbb69hS7t6ETgHrYX2mooa0x2Tsur0I6bLcEQi2jJZd2bFA5pSGgaASKia9QKetb/exec";
 
         let globalTemps = [];
         let globalBats = [];
@@ -106,6 +106,26 @@
         
         const batChart = new Chart(document.getElementById('batChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Tensión (V)', data: [], borderColor: '#00f260', backgroundColor: 'rgba(0, 242, 96, 0.2)', borderWidth: 2, tension: 0.2, fill: true }] }, options: commonOptions });
         
+        function poblarSelectConHojas(nombresHojas) {
+            const select = document.getElementById('dateInput');
+            select.innerHTML = ''; // limpiar por si acaso
+            const valorAnterior = select.value;
+
+            nombresHojas.forEach(function(nombre) {
+                const opt = document.createElement('option');
+                opt.value = nombre;
+                opt.textContent = nombre;
+                select.appendChild(opt);
+            });
+            if (valorAnterior && nombresHojas.includes(valorAnterior)) {
+                select.value = valorAnterior;
+            } else if (nombresHojas.length > 0) {
+                // valor anterior ya no existe → selecciona la primera o la que quieras
+                select.value = nombresHojas[0];
+            }
+            }
+
+
         function verificarModo() {
             const selector = document.getElementById('sampleLimit');
             const manualInput = document.getElementById('manualInput');
@@ -118,7 +138,15 @@
             actualizarGraficas();
         }
 
-
+        async function DatosSelect() {
+            try{
+                const resHojas = await fetch(`${APPS_SCRIPT_URL}?action=getSheets`).then(r => r.json());
+                poblarSelectConHojas(resHojas);
+            }
+        catch (error) {
+            console.error("Error al obtener las hojas:", error);
+        }
+        }
         async function descargarDatos() {
             const statusDiv = document.getElementById('status-indicator');
             const dateInput = document.getElementById('dateInput');
@@ -129,9 +157,11 @@
                     fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=6&date=${dateInput.value}`).then(r => r.json()),
                     fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=1&date=${dateInput.value}`).then(r => r.json()),
                     fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=3&date=${dateInput.value}`).then(r => r.json()),
-                    fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=2&date=${dateInput.value}`).then(r => r.json())
+                    fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=2&date=${dateInput.value}`).then(r => r.json()),
+                    
                 ]);
 
+                
                 // Guardamos los datos "crudos" y luego los procesamos en actualizarGraficas
                 globalRawTimes = resTime; 
                 globalTemps = resTemp.map(t=>t.replace(',', '.')).map(t => parseFloat(t));
@@ -215,6 +245,7 @@
             }
         }
 
+        DatosSelect();
         descargarDatos(); 
         setInterval(descargarDatos, 10000); 
     </script>
