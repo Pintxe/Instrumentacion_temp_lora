@@ -52,8 +52,9 @@
             <div class="big-value temp-color"><span id="tempValue">--</span> °C</div>
         </div>
         <div class="card">
-            <h3>Estado Batería</h3>
+            <h3>Batería</h3>
             <div class="big-value bat-color"><span id="batPercent">--</span>%</div>
+            <div class="small-value"><span id="batVoltValue">--</span> V</div>
         </div>
         <div class="card">
             <h3>Alarma</h3>
@@ -102,8 +103,9 @@
         };
 
         const tempChart = new Chart(document.getElementById('tempChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Temp', data: [], borderColor: '#4facfe', backgroundColor: 'rgba(79, 172, 254, 0.2)', borderWidth: 2, tension: 0.2, fill: true }] }, options: commonOptions });
-        const batChart = new Chart(document.getElementById('batChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Bat', data: [], borderColor: '#00f260', backgroundColor: 'rgba(0, 242, 96, 0.2)', borderWidth: 2, tension: 0.2, fill: true }] }, options: commonOptions });
-
+        
+        const batChart = new Chart(document.getElementById('batChart'), { type: 'line', data: { labels: [], datasets: [{ label: 'Tensión (V)', data: [], borderColor: '#00f260', backgroundColor: 'rgba(0, 242, 96, 0.2)', borderWidth: 2, tension: 0.2, fill: true }] }, options: commonOptions });
+        
         function verificarModo() {
             const selector = document.getElementById('sampleLimit');
             const manualInput = document.getElementById('manualInput');
@@ -123,16 +125,18 @@
             if(globalRawTimes.length === 0) statusDiv.innerText = "Sincronizando...";
             
             try {
-                const [resTime, resTemp, resBat] = await Promise.all([
+                const [resTime, resTemp, resBat,resVolt] = await Promise.all([
                     fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=6&date=${dateInput.value}`).then(r => r.json()),
                     fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=1&date=${dateInput.value}`).then(r => r.json()),
-                    fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=3&date=${dateInput.value}`).then(r => r.json())
+                    fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=3&date=${dateInput.value}`).then(r => r.json()),
+                    fetch(`${APPS_SCRIPT_URL}?action=getDate&campo=2&date=${dateInput.value}`).then(r => r.json())
                 ]);
 
                 // Guardamos los datos "crudos" y luego los procesamos en actualizarGraficas
                 globalRawTimes = resTime; 
                 globalTemps = resTemp.map(t=>t.replace(',', '.')).map(t => parseFloat(t));
                 globalBats = resBat.map(t=>t.replace(',', '.')).map(t => parseFloat(t));
+                globalVolts = resVolt.map(t=>t.replace(',', '.')).map(t => parseFloat(t));
 
                 if (resTime.error || resTemp.error) {
                     statusDiv.innerText = "Error leyendo Excel.";
@@ -166,16 +170,18 @@
             const tiemposProcesados = globalRawTimes
 
             // 3. Recortar arrays
-            let labelsCortados, tempCortados, batCortados;
+            let labelsCortados, tempCortados, batCortados, voltCortados;
             
             if (limit === 0 || limit > globalRawTimes.length) {
                 labelsCortados = tiemposProcesados;
                 tempCortados = globalTemps;
                 batCortados = globalBats;
+                voltCortados = globalVolts;
             } else {
                 labelsCortados = tiemposProcesados.slice(-limit);
                 tempCortados = globalTemps.slice(-limit);
                 batCortados = globalBats.slice(-limit);
+                voltCortados = globalVolts.slice(-limit);
             }
 
             // 4. Actualizar Gráficas
@@ -184,14 +190,16 @@
             tempChart.update();
 
             batChart.data.labels = labelsCortados;
-            batChart.data.datasets[0].data = batCortados;
+            batChart.data.datasets[0].data = voltCortados;
             batChart.update();
 
             // 5. Actualizar Valores Numéricos
             const ultimoTemp = globalTemps[globalTemps.length - 1];
             const ultimoBat = globalBats[globalBats.length - 1];
+            const ultimoVolt = globalVolts[globalVolts.length - 1];
             document.getElementById('tempValue').innerText = ultimoTemp;
             document.getElementById('batPercent').innerText = ultimoBat;
+            document.getElementById('batVoltValue').innerText = ultimoVolt; // Mostrar voltaje pequeño
 
             // 6. Alarma
             const light = document.getElementById('alarmLight');
